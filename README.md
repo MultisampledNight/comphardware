@@ -100,6 +100,11 @@ Out[13]:
 In [14]: # hehe, well, okay, an i5-2520M might be really not as good as an i5-3570K
 ```
 
+## Documentation
+
+There is no real one, the library is way too small for that.
+`help("comphardware")` in the Python REPL is quite explanatory though
+
 ## Credits
 
 Credits go to
