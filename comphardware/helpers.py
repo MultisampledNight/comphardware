@@ -19,10 +19,12 @@ Some helper functions for easier parsing of values.
 import difflib
 import platform
 import subprocess
+import warnings
 from typing import Optional
 
 import psutil
 from OpenGL.GL import glGetString, GL_RENDERER
+from OpenGL.error import NullFunctionError
 from OpenGL.GLUT import (glutInit, glutCreateWindow, glutIdleFunc,
     glutDisplayFunc, glutMainLoop, glutLeaveMainLoop, glutSetOption,
     GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS)
@@ -169,7 +171,7 @@ def find_gpu_by_model(model: str) -> GPU:
     return _find_by_model(GPU, MODEL_TO_GPU, model)
 
 
-def user_cpu() -> CPU:
+def user_cpu() -> Optional[CPU]:
     """
     Tries to determine the user's CPU, depending on the current platform.
     Returns None if the CPU can't be found in the database or is unable to be
@@ -224,7 +226,7 @@ def user_cpu() -> CPU:
     return actual_cpu
 
 
-def user_gpu() -> GPU:
+def user_gpu() -> Optional[GPU]:
     """
     Tries to determine the GPU model name by quickly opening a window with GLUT,
     retrieving the renderer, and exiting as fast as possible. Then it searches
@@ -236,42 +238,48 @@ def user_gpu() -> GPU:
     if not isinstance(_cached_gpu, int):
         return _cached_gpu
 
-    # this is the most portable solution I found, even though on laptops with
-    # iGPU and dGPU this might not be consistent (such as on mine)
-    glutInit()
-    # if this is unset, GLUT just thinks that exiting the whole application is
-    # fine (a bit like the "this is fine" meme)
-    glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS)
-    glutCreateWindow("comphardware tries to get the GPU, please ignore")
+    try:
+        # this is the most portable solution I found, even though on laptops with
+        # iGPU and dGPU this might not be consistent (such as on mine)
+        glutInit()
+        # if this is unset, GLUT just thinks that exiting the whole application is
+        # fine (a bit like the "this is fine" meme)
+        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS)
+        glutCreateWindow("comphardware tries to get the GPU, please ignore")
 
-    renderer = None
-    
-    def get_renderer_and_exit():
-        """
-        Our one-way function to give to GLUT for getting the renderer and
-        exiting directly
-        """
-        nonlocal renderer
-        # yeet the renderer in
-        renderer = glGetString(GL_RENDERER)\
-            .decode(errors="ignore")\
-            .strip()\
-            .casefold()
-        # exit asap
-        glutLeaveMainLoop()
-    
-    # doubled won't hurt too much I guess
-    glutIdleFunc(get_renderer_and_exit)
-    glutDisplayFunc(get_renderer_and_exit)
-    glutMainLoop()
+        renderer = None
+        
+        def get_renderer_and_exit():
+            """
+            Our one-way function to give to GLUT for getting the renderer and
+            exiting directly
+            """
+            nonlocal renderer
+            # yeet the renderer in
+            renderer = glGetString(GL_RENDERER)\
+                .decode(errors="ignore")\
+                .strip()\
+                .casefold()
+            # exit asap
+            glutLeaveMainLoop()
+        
+        # doubled won't hurt too much I guess
+        glutIdleFunc(get_renderer_and_exit)
+        glutDisplayFunc(get_renderer_and_exit)
+        glutMainLoop()
 
-    # phew, we're out of the name hell, let's get the actual GPU which has the
-    # just extracted model
-    actual_gpu = find_gpu_by_model(renderer)
+        # phew, we're out of the name hell, let's get the actual GPU which has the
+        # just extracted model
+        actual_gpu = find_gpu_by_model(renderer)
 
-    _cached_gpu = actual_gpu
+        _cached_gpu = actual_gpu
 
-    return actual_gpu
+        return actual_gpu
+    except NullFunctionError:
+        # oh crap, GLUT isn't installed (or can't be found)
+        # just warn the user then and return None
+        warnings.warn("freeglut isn't installed, unable to retrieve GPU!")
+        return None
 
 
 def user_setup() -> SystemSetup:
