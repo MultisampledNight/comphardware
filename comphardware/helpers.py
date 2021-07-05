@@ -21,6 +21,7 @@ import platform
 import subprocess
 from typing import Optional
 
+import cpuinfo
 import psutil
 from OpenGL.GL import glGetString, GL_RENDERER
 from OpenGL.GLUT import (glutInit, glutCreateWindow, glutIdleFunc,
@@ -174,8 +175,6 @@ def user_cpu() -> CPU:
     Tries to determine the user's CPU, depending on the current platform.
     Returns None if the CPU can't be found in the database or is unable to be
     determined.
-    
-    WARNING: Only implemented for Windows, Darwin and Linux. So no SunOS or BSD.
     """
     global _cached_cpu
 
@@ -183,34 +182,11 @@ def user_cpu() -> CPU:
     if not isinstance(_cached_cpu, int):
         return _cached_cpu
 
-    # first find the CPU model itself
+    # first find the CPU model itself (just misuse py-cpuinfo here)
     # thanks Dummerle! uwu
+    cluttered_cpu = cpuinfo.get_cpu_info().get("brand_raw", None)
 
-    # the cpu returned by the functions below is a bit scuffed with
-    # uninteresting information, so creating a temp variable for it
-    cluttered_cpu = ""
-
-    if platform.system() == "Windows":
-        # on Windows we can just use the stdlib
-        cluttered_cpu = platform.processor().strip()
-
-    elif platform.system() == "Darwin":
-        # on Mac OS/Darwin we can ask sysctl for it
-        command = "/usr/sbin/sysctl -n machdep.cpu.brand_string"
-        cluttered_cpu = subprocess.check_output(command, text=True).strip()
-    
-    elif platform.system() == "Linux":
-        # and on Linux we can just check the `lscpu` command
-        raw_output = subprocess.check_output("lscpu", text=True)\
-            .casefold()\
-            .split("\n")
-        for line in raw_output:
-            if "model" in line:
-                cluttered_cpu = line.split(":")[-1].strip()
-                break
-
-    # returning preliminary if the CPU string is empty, since "" is in
-    # everything and would remain the last CPU in the database
+    # returning preliminary if the CPU string is empty
     if not cluttered_cpu:
         return None
 

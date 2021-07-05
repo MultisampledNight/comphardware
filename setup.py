@@ -5,7 +5,7 @@ with open("README.md", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="comphardware",
-    version="0.1.1",
+    version="0.1.2",
     license="Apache-2",
     url="https://github.com/MultisampledNight/comphardware",
 
@@ -31,11 +31,8 @@ setuptools.setup(
     ],
     python_requires=">=3.8",
     install_requires=[
-        "bs4",
-        "pandas",
         "psutil",
-        "requests",
-        "PyOpenGL",
+        "py-cpuinfo",
         "setuptools",
     ],
 
