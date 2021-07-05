@@ -11,7 +11,6 @@ The library probably isn't suitable for production use yet. Reasons include:
   for them.
 - No real testing done yet.
 - Depending on having freeglut installed for getting the user's GPU.
-- (Optional) No BSD support for getting the CPU.
 
 If I/we somehow manage to fix all of these points, I might consider going
 stable. 
