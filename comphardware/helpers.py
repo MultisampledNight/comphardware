@@ -32,6 +32,9 @@ from .data import ALL_GPUS, ALL_CPUS, MODEL_TO_GPU, MODEL_TO_CPU
 from ._models import GPU, CPU, SystemSetup
 
 
+# formed with help from https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/win32-videocontroller
+WMIC_QUERY_COMMAND = ["WMIC", "PATH", "Win32_VideoController", "GET", "Name"]
+
 _cached_cpu = 0
 _cached_gpu = 0
 
@@ -121,8 +124,7 @@ def _find_by_model(cls, database: dict, unexact_model: str):
         # yep, a bit confusing, but basically
         # the first two arguments mean start:end of seq1 to search
         # the second two arguments mean start:end of seq2 to search
-        match = sequence_matcher.find_longest_match(0, len(model), 0,
-                len(unexact_model))
+        match = sequence_matcher.find_longest_match()
 
         # is it even better than any matches before?
         if match[2] > current_score:
@@ -200,18 +202,17 @@ def user_cpu() -> CPU:
     return actual_cpu
 
 
-def user_gpu() -> GPU:
+def _user_gpu_by_opengl() -> str:
     """
     Tries to determine the GPU model name by quickly opening a window with GLUT,
-    retrieving the renderer, and exiting as fast as possible. Then it searches
-    the GPU database for the extracted renderer.
-    """
-    global _cached_gpu
-    # first of all, do we have it cached? if yes, just return it, GLUT doesn't
-    # like calling glutMainLoop() multiple times
-    if not isinstance(_cached_gpu, int):
-        return _cached_gpu
+    retrieving the renderer, and exiting as fast as possible.
 
+    NOTE: Raises an exception (OpenGL.error.NullFunctionError to be exact) if
+    GLUT/freeglut isn't installed. Be sure to catch that/everything if you don't
+    want your application to randomly crash.
+    NOTE 2: Don't even try to call this a second time. GLUT really doesn't like
+    being initialized twice.
+    """
     # this is the most portable solution I found, even though on laptops with
     # iGPU and dGPU this might not be consistent (such as on mine)
     glutInit()
@@ -241,10 +242,114 @@ def user_gpu() -> GPU:
     glutDisplayFunc(get_renderer_and_exit)
     glutMainLoop()
 
-    # phew, we're out of the name hell, let's get the actual GPU which has the
-    # just extracted model
-    actual_gpu = find_gpu_by_model(renderer)
+    return renderer
 
+
+def _user_gpu_by_platform() -> str:
+    """
+    Tries to get the user's GPU by a platform dependent way, such as with WMIC
+    on Woe and lspci on Linux (or pciconf on BSD, but that's unimplemented yet.)
+
+    WARNING: Only implemented for Linux and Woe yet! No Mac OS, no BSD. Raises
+    an NotImplemented if the platform isn't supported (yet).
+    """
+    gpu_model = None
+    system = platform.system()
+
+    if system == "Linux":
+        lspci_output = subprocess.check_output("lspci", text=True).split("\n")
+        # a line in the output of lspci looks like this
+        #   01:00.0 VGA compatible controller: NVIDIA Corporation GF119M [NVS 4200M] (rev a1)
+        # I'll just split at : and take the last element (note the : directly at
+        # the start)
+        for line in lspci_output:
+            if line.strip() == "":
+                continue
+            elif "VGA compatible controller" in line:
+                colon_splitted = line.split(":")
+                raw_model = colon_splitted[-1]
+
+                gpu_model = ""
+                # let's remove clutter like (rev a1)
+                for i, char in enumerate(raw_model):
+                    if char == "(":
+                        # well, the perfect example: (rev a1)
+                        break
+                    elif char == "]":
+                        # oh, that's way more interesting than the rest of the
+                        # raw model (like you see above with [NVS 4200M])
+
+                        # illustration:
+                        #   doging doge 21235 doge [Doge 4450A] (doge)
+                        #                                     ^
+                        #                                     i
+                        before_closing_bracket = raw_model[:i]
+                        gpu_model = before_closing_bracket.split("[")[-1]
+                        break  # if we wouldn't break here, it would happily
+                               # append everything behind ] also to the GPU
+                               # model
+                    else:
+                        gpu_model += char
+
+                # not breaking as I found the last card being more important
+                # (heavily depends on the setup though)
+
+    elif system == "Windows":
+        # yep, a query using WMIC might seem a bit weird, but maybe relying on
+        # WMIC is better than having wmi as dependency (which failed on Wine
+        # qwq)
+        # the output of the WMIC query looks like this
+        #   "Name                    \r\nNVIDIA GeForce GTX 470  \r\n"
+        wmic_query_output = subprocess \
+            .check_output(WMIC_QUERY_COMMAND) \
+            .decode(encoding="utf-16")  # thanks for that jumpscare, UTF-16
+
+        # so what should we do? of course, we just take the second line,
+        # whatever
+        gpu_model = wmic_query_output.split("\r\n")[1]
+    else:
+        raise NotImplented(f"Platform {system} not implemented!")
+
+    return gpu_model
+
+
+def user_gpu(force_no_window=False) -> Optional[GPU]:
+    """
+    Tries to get the GPU by
+    
+    1. Trying to open a window with GLUT/freeglut, creating an OpenGL context
+       and getting the renderer (not tried if force_no_window is set to True)
+    2. Using a platform-dependent way, which is often way less precise though.
+
+    Returns None if all methods failed.
+    """
+    global _cached_gpu
+    # first of all, do we have it cached? if yes, just return it
+    if not isinstance(_cached_gpu, int):
+        return _cached_gpu
+
+    # then try all methods we've got so far
+    gpu_model = None
+    if not force_no_window:
+        try:
+            gpu_model = _user_gpu_by_opengl()
+        except:
+            # either GLUT wasn't found or I fell in one of the various holes you
+            # can fall in when using OpenGL/GLUT
+            # either way, unable to extract GPU
+            pass
+    
+    if gpu_model is None:
+        try:
+            gpu_model = _user_gpu_by_platform()
+        except NotImplemented:
+            # platform unsupported :(
+            pass
+
+    if gpu_model is None:
+        return None
+
+    actual_gpu = find_gpu_by_model(gpu_model)
     _cached_gpu = actual_gpu
 
     return actual_gpu
