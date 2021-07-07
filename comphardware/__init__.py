@@ -77,7 +77,8 @@ __version__ = "0.1.2"
 
 
 from ._models import GPU, CPU, SystemSetup
-from .helpers import user_setup, setup_from_clutter
+from .helpers import setup_from_clutter
+from .platform_info import user_setup
 
 
 # vim:textwidth=80:
