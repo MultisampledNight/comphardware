@@ -19,6 +19,7 @@ Functions for getting information on the current running platform.
 import platform
 import subprocess
 from typing import Optional
+from xml.etree import ElementTree
 
 import cpuinfo
 import psutil
@@ -33,6 +34,8 @@ from .helpers import find_gpu_by_model, find_cpu_by_model, SystemSetup
 
 # formed with help from https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/win32-videocontroller
 WMIC_QUERY_COMMAND = ["WMIC", "PATH", "Win32_VideoController", "GET", "Name"]
+# and that one is just straight taken from the manpage
+IOREG_COMMAND = ["/usr/sbin/ioreg", "-la"]
 
 
 _cached_cpu = 0
@@ -117,8 +120,8 @@ def _user_gpu_by_platform() -> str:
     Tries to get the user's GPU by a platform dependent way, such as with WMIC
     on Woe and lspci on Linux (or pciconf on BSD, but that's unimplemented yet.)
 
-    WARNING: Only implemented for Linux and Woe yet! No Mac OS, no BSD. Raises
-    an NotImplemented if the platform isn't supported (yet).
+    WARNING: Only implemented for Linux, Woe and Mac yet! No BSD or Sun. Raises
+    a NotImplemented if the platform isn't supported (yet).
     """
     gpu_model = None
     system = platform.system()
@@ -174,8 +177,30 @@ def _user_gpu_by_platform() -> str:
         # so what should we do? of course, we just take the second line,
         # whatever
         gpu_model = wmic_query_output.split("\r\n")[1]
+
+    elif system == "Darwin":
+        # the idea is to parse the output of `/usr/sbin/ioreg -la`, which is
+        # XML, and then to find the one string value which contains "MTLDriver"
+        # that's the GPU
+        
+        # first of all, run ioreg
+        ioreg_output = subprocess.check_output(IOREG_COMMAND, text=True)
+
+        # for parsing the XML etree isn't a bad choice I guess
+        tree = ElementTree.fromstring(ioreg_output)
+        root = tree.getroot()
+
+        # iterate through all <string> elements and find the designated one by
+        # looking if it contains "MTLDriver"
+        for string_element in root.iter(tag="string"):
+            if (string_element.text is not None
+                and "MTLDriver" in string_element.text):
+                # that's the one!
+                gpu_model = string_element.text.removesuffix("MTLDriver")
+                break
+
     else:
-        raise NotImplented(f"Platform {system} not implemented!")
+        raise NotImplemented(f"Platform '{system}' not implemented!")
 
     return gpu_model
 
@@ -243,3 +268,6 @@ def user_setup() -> SystemSetup:
     )
 
     return setup
+
+
+# vim:tw=80:
