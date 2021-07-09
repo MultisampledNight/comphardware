@@ -23,10 +23,16 @@ from xml.etree import ElementTree
 
 import cpuinfo
 import psutil
-from OpenGL.GL import glGetString, GL_RENDERER
-from OpenGL.GLUT import (glutInit, glutCreateWindow, glutIdleFunc,
-    glutDisplayFunc, glutMainLoop, glutLeaveMainLoop, glutSetOption,
-    GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS)
+
+gl_available = True
+try:
+    from OpenGL.GL import glGetString, GL_RENDERER
+    from OpenGL.GLUT import (glutInit, glutCreateWindow, glutIdleFunc,
+        glutDisplayFunc, glutMainLoop, glutLeaveMainLoop, glutSetOption,
+        GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS)
+except ImportError:
+    gl_available = False
+    pass
 
 from ._models import GPU, CPU
 from .helpers import find_gpu_by_model, find_cpu_by_model, SystemSetup
@@ -83,6 +89,10 @@ def _user_gpu_by_opengl() -> str:
     NOTE 2: Don't even try to call this a second time. GLUT really doesn't like
     being initialized twice.
     """
+    if not gl_available:
+        # then we can just forget it directly
+        raise NotImplemented("GL couldn't be loaded!")
+
     # this is the most portable solution I found, even though on laptops with
     # iGPU and dGPU this might not be consistent (such as on mine)
     glutInit()

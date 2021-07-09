@@ -73,7 +73,7 @@ compared with the minimum requirements of Satisfactory:
 __all__ = ["GPU", "CPU", "SystemSetup", "user_setup", "setup_from_clutter"]
 
 __author__ = "MultisampledNight"
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 
 from ._models import GPU, CPU, SystemSetup
