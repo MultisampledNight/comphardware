@@ -91,7 +91,7 @@ def _user_gpu_by_opengl() -> str:
     """
     if not gl_available:
         # then we can just forget it directly
-        raise NotImplemented("GL couldn't be loaded!")
+        raise Exception("GL couldn't be loaded!")
 
     # this is the most portable solution I found, even though on laptops with
     # iGPU and dGPU this might not be consistent (such as on mine)
@@ -131,7 +131,7 @@ def _user_gpu_by_platform() -> str:
     on Woe and lspci on Linux (or pciconf on BSD, but that's unimplemented yet.)
 
     WARNING: Only implemented for Linux, Woe and Mac yet! No BSD or Sun. Raises
-    a NotImplemented if the platform isn't supported (yet).
+    an Exception if the platform isn't supported (yet).
     """
     gpu_model = None
     system = platform.system()
@@ -197,8 +197,7 @@ def _user_gpu_by_platform() -> str:
         ioreg_output = subprocess.check_output(IOREG_COMMAND, text=True)
 
         # for parsing the XML etree isn't a bad choice I guess
-        tree = ElementTree.fromstring(ioreg_output)
-        root = tree.getroot()
+        root = ElementTree.fromstring(ioreg_output)
 
         # iterate through all <string> elements and find the designated one by
         # looking if it contains "MTLDriver"
@@ -210,7 +209,7 @@ def _user_gpu_by_platform() -> str:
                 break
 
     else:
-        raise NotImplemented(f"Platform '{system}' not implemented!")
+        raise Exception(f"Platform '{system}' not implemented!")
 
     return gpu_model
 
@@ -244,7 +243,7 @@ def user_gpu(force_no_window=False) -> Optional[GPU]:
     if gpu_model is None:
         try:
             gpu_model = _user_gpu_by_platform()
-        except NotImplemented:
+        except:
             # platform unsupported :(
             pass
 
