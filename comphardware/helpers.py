@@ -107,7 +107,8 @@ def _find_by_model(cls, database: dict, unexact_model: str):
         # yep, a bit confusing, but basically
         # the first two arguments mean start:end of seq1 to search
         # the second two arguments mean start:end of seq2 to search
-        match = sequence_matcher.find_longest_match()
+        match = sequence_matcher.find_longest_match(0, len(model), 0,
+                len(unexact_model))
 
         # is it even better than any matches before?
         if match[2] > current_score:
