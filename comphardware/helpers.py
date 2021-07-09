@@ -18,7 +18,6 @@ Some helper functions for easier parsing of values.
 """
 import difflib
 
-
 from .data import ALL_GPUS, ALL_CPUS, MODEL_TO_GPU, MODEL_TO_CPU
 from ._models import GPU, CPU, SystemSetup
 
@@ -154,7 +153,6 @@ def find_gpu_by_model(model: str) -> GPU:
     If in the database are multiple matches, the first one is returned.
     """
     return _find_by_model(GPU, MODEL_TO_GPU, model)
-
 
 def setup_from_clutter(cpu_clutter: str, gpu_clutter: str, ram_clutter: str) -> SystemSetup:
     """
