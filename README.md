@@ -1,3 +1,9 @@
+# Archived
+
+This repository is archived for now because there's no real way for getting the
+system components' specifications, and also it's very hard to keep a whole
+hardware database always up to date. Sorry.
+
 # comphardware
 
 Compare hardware like two numbers.
